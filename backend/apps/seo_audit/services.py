@@ -6,21 +6,18 @@ from bs4 import BeautifulSoup
 
 
 def _get_ssl_context():
-    """
-    Uses ssl.create_default_context() which on Windows automatically loads
-    from the Windows certificate store (including corporate CAs), and on
-    Linux/Docker uses the system CA bundle. Works on all platforms without
-    third-party dependencies.
-    """
     return ssl.create_default_context()
 
 
 def perform_seo_analysis(url: str, target_keywords: list[str] = None):
     start_time = time.perf_counter()
 
+    print(f"--- Starting Analysis for: {url} ---")
+
     try:
         response = httpx.get(url, follow_redirects=True, timeout=10.0, verify=_get_ssl_context())
         html_content = response.text
+
     except Exception as e:
         return {"status": "Error", "message": str(e)}
 
@@ -31,6 +28,10 @@ def perform_seo_analysis(url: str, target_keywords: list[str] = None):
     title = soup.title.string if soup.title else ""
     h1_tags = [h1.get_text(strip=True) for h1 in soup.find_all('h1')]
     
+    # DEBUG: See what metadata was found
+    print(f"[DEBUG] Title Found: '{title}'")
+    print(f"[DEBUG] H1 Tags Found: {len(h1_tags)}")
+
     # 2. Keyword Analysis
     keyword_results = {}
     if target_keywords:
@@ -40,7 +41,11 @@ def perform_seo_analysis(url: str, target_keywords: list[str] = None):
         for kw in target_keywords:
             kw_lower = kw.lower()
             # Count occurrences using regex for word boundaries
-            count = len(re.findall(rf'\b{re.escape(kw_lower)}\b', page_text))
+            matches = re.findall(rf'\b{re.escape(kw_lower)}\b', page_text)
+            count = len(matches)
+            
+            # DEBUG: Log the specific keyword hits
+            print(f"[DEBUG] Keyword '{kw}': Found {count} matches.")
             
             keyword_results[kw] = {
                 "count": count,
@@ -49,6 +54,7 @@ def perform_seo_analysis(url: str, target_keywords: list[str] = None):
                 "density_score": round((count / len(page_text.split())) * 100, 2) if page_text.split() else 0
             }
 
+    print(f"--- Analysis Complete ({round(end_time - start_time, 2)}s) ---")
     return {
         "url": url,
         "title": title,
@@ -56,3 +62,7 @@ def perform_seo_analysis(url: str, target_keywords: list[str] = None):
         "keyword_analysis": keyword_results,
         "status": "Success"
     }
+
+# Example Usage to test:
+# results = perform_seo_analysis("https://www.example.com", ["example", "domain"])
+# print(results)
