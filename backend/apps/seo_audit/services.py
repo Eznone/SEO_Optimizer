@@ -1,13 +1,25 @@
 import httpx
 import time
 import re
+import ssl
 from bs4 import BeautifulSoup
+
+
+def _get_ssl_context():
+    """
+    Uses ssl.create_default_context() which on Windows automatically loads
+    from the Windows certificate store (including corporate CAs), and on
+    Linux/Docker uses the system CA bundle. Works on all platforms without
+    third-party dependencies.
+    """
+    return ssl.create_default_context()
+
 
 def perform_seo_analysis(url: str, target_keywords: list[str] = None):
     start_time = time.perf_counter()
-    
+
     try:
-        response = httpx.get(url, follow_redirects=True, timeout=10.0)
+        response = httpx.get(url, follow_redirects=True, timeout=10.0, verify=_get_ssl_context())
         html_content = response.text
     except Exception as e:
         return {"status": "Error", "message": str(e)}
