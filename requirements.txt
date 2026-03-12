@@ -1,2 +1,8 @@
 django
 django-ninja
+httpx
+beautifulsoup4
+lxml
+celery
+redis
+eventlet
