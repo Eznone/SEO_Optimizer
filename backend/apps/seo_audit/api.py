@@ -26,7 +26,7 @@ def start_audit(request, data: AuditRequest):    # Validating the URL
         task = run_seo_audit_task.delay(data.url, data.target_keywords)
         return {
             "message": "SEO audit started",
-            "task_id": task.id
+            "job_id": task.id
         }
     except Exception as e:
         return 500, {
