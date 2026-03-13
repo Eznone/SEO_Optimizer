@@ -1,12 +1,7 @@
-import httpx
+import requests
 import time
 import re
-import ssl
 from bs4 import BeautifulSoup
-
-
-def _get_ssl_context():
-    return ssl.create_default_context()
 
 
 def perform_seo_analysis(url: str, target_keywords: list[str] = None):
@@ -15,14 +10,16 @@ def perform_seo_analysis(url: str, target_keywords: list[str] = None):
     print(f"--- Starting Analysis for: {url} ---")
 
     try:
-        response = httpx.get(url, follow_redirects=True, timeout=10.0, verify=_get_ssl_context())
+        # Use requests for better compatibility with eventlet on Windows
+        response = requests.get(url, allow_redirects=True, timeout=10.0)
+        response.raise_for_status()
         html_content = response.text
 
     except Exception as e:
         return {"status": "Error", "message": str(e)}
 
     end_time = time.perf_counter()
-    soup = BeautifulSoup(html_content, 'lxml')
+    soup = BeautifulSoup(html_content, 'html.parser')
     
     # 1. Basic SEO Extraction
     title = soup.title.string if soup.title else ""
