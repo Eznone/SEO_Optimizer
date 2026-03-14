@@ -1,7 +1,14 @@
 from ninja import Router
 from typing import List
-from .schemas import SitemapCreateSchema, SitemapResponseSchema
-from .models import SitemapJob
+from django.shortcuts import get_object_or_404
+from .schemas import (
+    SitemapCreateSchema, 
+    SitemapResponseSchema, 
+    RecommendationSchema, 
+    IssueSchema, 
+    PageSchema
+)
+from .models import SitemapJob, Recommendation, AuditIssue, Page
 from .tasks import crawl_and_generate_sitemap
 
 router = Router()
@@ -25,8 +32,31 @@ def get_sitemap_status(request, job_id: str):
     """
     Check the status of a specific sitemap generation job.
     """
-    job = SitemapJob.objects.get(id=job_id)
-    # We can inject the file URL if it's finished
+    job = get_object_or_404(SitemapJob, id=job_id)
     if job.sitemap_file:
         job.sitemap_url = job.sitemap_file.url
     return job
+
+@router.get("/generate/{job_id}/recommendations", response=List[RecommendationSchema])
+def get_job_recommendations(request, job_id: str):
+    """
+    Get prioritized SEO recommendations based on the crawl.
+    """
+    job = get_object_or_404(SitemapJob, id=job_id)
+    return list(Recommendation.objects.filter(job=job).order_by('priority'))
+
+@router.get("/generate/{job_id}/issues", response=List[IssueSchema])
+def get_job_issues(request, job_id: str):
+    """
+    Get detailed SEO issues found during the crawl.
+    """
+    job = get_object_or_404(SitemapJob, id=job_id)
+    return list(AuditIssue.objects.filter(job=job).select_related('page'))
+
+@router.get("/generate/{job_id}/pages", response=List[PageSchema])
+def get_job_pages(request, job_id: str):
+    """
+    Get a list of all pages crawled for the given job.
+    """
+    job = get_object_or_404(SitemapJob, id=job_id)
+    return list(Page.objects.filter(job=job))

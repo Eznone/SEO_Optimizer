@@ -1,53 +1,39 @@
 from celery import shared_task
-from .models import SitemapJob
-from .services import SitemapGenerator
+from .models import SitemapJob, Page
+from .services import SitemapGenerator, SiteCrawler, SiteAnalyzer
 from django.core.files.base import ContentFile
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
 import logging
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 @shared_task
 def crawl_and_generate_sitemap(job_id):
-    job = SitemapJob.objects.get(id=job_id)
+    try:
+        job = SitemapJob.objects.get(id=job_id)
+    except SitemapJob.DoesNotExist:
+        logger.error(f"SitemapJob {job_id} not found.")
+        return
+
     job.status = 'processing'
     job.save()
 
     try:
-        logger.info(f"Starting crawl for: {job.target_url}")
+        logger.info(f"Starting deep crawl for: {job.target_url}")
+        
+        # 1. Crawl the site
+        crawler = SiteCrawler(job, max_pages=500)
+        crawler.crawl()
 
-        # Use requests for better compatibility with eventlet on Windows
-        response = requests.get(job.target_url, timeout=10.0, allow_redirects=True)
-        response.raise_for_status()
-        html_content = response.text
+        # 2. Analyze the collected data for SEO issues
+        logger.info(f"Analyzing crawl data for job {job_id}")
+        analyzer = SiteAnalyzer(job)
+        analyzer.analyze()
 
-        logger.info(f"Successfully fetched HTML. Content length: {len(html_content)}")
-
-        soup = BeautifulSoup(html_content, 'html.parser')
-        base_url = job.target_url
-        domain = urlparse(base_url).netloc
-
-        logger.info(f"Parsing links for domain: {domain}")
-
-        # Robust URL extraction: handles relative paths and filters for same domain
-        links = set()
-        for a in soup.find_all('a', href=True):
-            href = a.get('href')
-            full_url = urljoin(base_url, href)
-
-            # Basic validation: ensure it's the same domain and starts with http/https
-            parsed_url = urlparse(full_url)
-            if parsed_url.netloc == domain and parsed_url.scheme in ('http', 'https'):
-                # Normalize URL by removing fragments
-                normalized_url = parsed_url._replace(fragment='').geturl()
-                links.add(normalized_url)
-
-        logger.info(f"Found {len(links)} internal links. Generating XML...")
-
-        # Generate XML
-        generator = SitemapGenerator(list(links))
+        # 3. Generate the XML Sitemap
+        # Only include valid, indexable pages returning 200 OK
+        valid_pages = Page.objects.filter(job=job, status_code=200, is_noindex=False)
+        generator = SitemapGenerator(list(valid_pages))
         xml_content = generator.generate_xml()
 
         logger.info("XML generated. Saving to file...")
@@ -56,33 +42,27 @@ def crawl_and_generate_sitemap(job_id):
             import os
             from eventlet.patcher import original
             
-            # Get the original, unpatched os module
             orig_os = original('os')
-            
-            # Store the patched fdopen
             patched_fdopen = os.fdopen
-            
-            # Temporarily restore the original fdopen
             os.fdopen = orig_os.fdopen
             try:
                 job.sitemap_file.save(f"{job.id}.xml", ContentFile(xml_content))
             finally:
-                # Always restore the patched version for Eventlet's sake
                 os.fdopen = patched_fdopen
 
-        # Execute the save in a thread pool
         try:
             from eventlet import tpool
             tpool.execute(perform_save)
         except (ImportError, AttributeError):
-            # Fallback for non-eventlet environments
             job.sitemap_file.save(f"{job.id}.xml", ContentFile(xml_content))
 
         logger.info("File saved successfully.")
 
         job.status = 'completed'
+        job.completed_at = timezone.now()
     except Exception as e:
         logger.error(f"Error generating sitemap for job {job_id}: {str(e)}", exc_info=True)
         job.status = 'failed'
+        job.completed_at = timezone.now()
 
     job.save()
