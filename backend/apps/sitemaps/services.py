@@ -34,6 +34,39 @@ class SiteCrawler:
             return True
         return False
 
+    def should_ignore(self, url):
+        """
+        Determines if a URL should be ignored based on common asset extensions
+        and framework-specific path segments.
+        """
+        parsed = urlparse(url)
+        path = parsed.path.lower()
+        
+        # 1. Check file extensions
+        ignored_extensions = (
+            '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp', # Images
+            '.css', '.js', '.map', # Assets
+            '.woff', '.woff2', '.ttf', '.eot', '.otf', # Fonts
+            '.mp4', '.webm', '.ogg', '.mp3', '.wav', # Media
+            '.pdf', '.zip', '.gz', '.tar', '.dmg', '.exe', # Files
+            '.webmanifest', '.json', '.xml' # Metadata/Config
+        )
+        if path.endswith(ignored_extensions):
+            return True
+
+        # 2. Check path segments (Framework noise and common asset folders)
+        ignored_segments = (
+            '/_next/', '/static/', '/favicons/', '/assets/', 
+            '/chunks/', '/wp-content/', '/wp-includes/', 
+            '/node_modules/', '/vendor/', '/bower_components/',
+            'data:', 'javascript:'
+        )
+        for segment in ignored_segments:
+            if segment in path or url.startswith(segment):
+                return True
+                
+        return False
+
     def crawl(self):
         # queue of (url, source_page_model, depth)
         queue = [(self.base_url, None, 0)]
@@ -42,6 +75,9 @@ class SiteCrawler:
             url, source_page, depth = queue.pop(0)
             normalized_url = self.normalize_url(url)
             
+            if self.should_ignore(normalized_url):
+                continue
+
             if normalized_url in self.visited_urls:
                 if source_page:
                     Link.objects.create(
@@ -126,8 +162,9 @@ class SiteCrawler:
                     # Next.js / Modern SPA support: Extract hrefs from script data
                     import re
                     script_content = "".join([s.text for s in soup.find_all('script') if s.text])
-                    # Pattern for "href":"/some-path" or "href":"https://..."
-                    href_patterns = re.findall(r'\"href\":\"([^\"]+)\"', script_content)
+                    # Pattern for "href":"/path", "pathname":"/path", or "url":"/path"
+                    # Handles optional backslashes before quotes common in escaped JSON
+                    href_patterns = re.findall(r'\\?"(?:href|pathname|url)\\?":\\?"([^\\"]+)\\?"', script_content)
                     for href in href_patterns:
                         # Clean escaped slashes common in JSON
                         clean_href = href.replace('\\/', '/')
@@ -136,6 +173,9 @@ class SiteCrawler:
                     for href, link_text, is_nofollow in found_urls:
                         full_url = urljoin(normalized_url, href)
                         
+                        if self.should_ignore(full_url):
+                            continue
+                            
                         if self.is_internal(full_url):
                             queue.append((full_url, page, depth + 1))
                         else:

@@ -1,0 +1,4 @@
+- Celery -> celery -A config worker -l info -P eventlet
+- Django -> python manage.py runserver
+- Redis -> Boot it on docker
+- Site to test -> http://127.0.0.1:8000/api/docs#/default/
