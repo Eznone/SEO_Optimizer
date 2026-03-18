@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'apps.sitemaps',
     'apps.seo_audit',
+    'apps.crawler',
 ]
 
 MIDDLEWARE = [
