@@ -13,7 +13,14 @@ class EEATScorer:
 
     def __init__(self, job: CrawlJob):
         self.job = job
-        self.api_key = os.getenv("GROQ_API_KEY", "your_groq_api_key_here")
+        self.api_key = self._get_user_api_key()
+
+    def _get_user_api_key(self):
+        """Fetches the Groq API key from the user's profile."""
+        if self.job.user and hasattr(self.job.user, 'profile'):
+            return self.job.user.profile.groq_api_key
+        # Fallback to env var for legacy/system jobs (optional)
+        return os.getenv("GROQ_API_KEY")
 
     def score_all_pages(self, limit=10):
         """Scores pages for E-E-A-T and Conversational Structure."""

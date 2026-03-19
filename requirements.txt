@@ -6,3 +6,4 @@ lxml
 celery
 redis
 eventlet
+django-allauth

@@ -1,8 +1,10 @@
 from django.db import models
+from django.contrib.auth.models import User
 import uuid
 
 class CrawlJob(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='crawl_jobs', null=True, blank=True)
     target_url = models.URLField()
     target_keywords = models.JSONField(default=list, blank=True)
     status = models.CharField(max_length=20, default='pending') # pending, processing, completed, failed

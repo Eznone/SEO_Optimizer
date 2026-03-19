@@ -10,6 +10,7 @@ router = Router()
 @router.post("/start", response={200: dict})
 def create_crawl_job(request, data: CrawlJobCreate):
     job = CrawlJob.objects.create(
+        user=request.auth,
         target_url=str(data.target_url),
         target_keywords=data.target_keywords or []
     )
@@ -18,7 +19,7 @@ def create_crawl_job(request, data: CrawlJobCreate):
 
 @router.get("/status/{job_id}", response=CrawlJobResponse)
 def get_crawl_job(request, job_id: str):
-    job = get_object_or_404(CrawlJob, id=job_id)
+    job = get_object_or_404(CrawlJob, id=job_id, user=request.auth)
     if job.generated_llms_txt:
         job.llms_txt_url = job.generated_llms_txt.url
     if job.generated_sitemap:
@@ -27,15 +28,15 @@ def get_crawl_job(request, job_id: str):
 
 @router.get("/status/{job_id}/issues", response=List[AuditIssueSchema])
 def get_job_issues(request, job_id: str):
-    job = get_object_or_404(CrawlJob, id=job_id)
+    job = get_object_or_404(CrawlJob, id=job_id, user=request.auth)
     return list(AuditIssue.objects.filter(job=job).select_related('page'))
 
 @router.get("/status/{job_id}/recommendations", response=List[RecommendationSchema])
 def get_job_recommendations(request, job_id: str):
-    job = get_object_or_404(CrawlJob, id=job_id)
+    job = get_object_or_404(CrawlJob, id=job_id, user=request.auth)
     return list(Recommendation.objects.filter(job=job).order_by('priority'))
 
 @router.get("/status/{job_id}/pages", response=List[CrawledPageSchema])
 def get_job_pages(request, job_id: str):
-    job = get_object_or_404(CrawlJob, id=job_id)
+    job = get_object_or_404(CrawlJob, id=job_id, user=request.auth)
     return list(CrawledPage.objects.filter(job=job))
