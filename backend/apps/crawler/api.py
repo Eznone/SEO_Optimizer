@@ -40,3 +40,7 @@ def get_job_recommendations(request, job_id: str):
 def get_job_pages(request, job_id: str):
     job = get_object_or_404(CrawlJob, id=job_id, user=request.auth)
     return list(CrawledPage.objects.filter(job=job))
+
+@router.get("/jobs", response=List[CrawlJobResponse])
+def list_crawl_jobs(request):
+    return list(CrawlJob.objects.filter(user=request.auth).order_by('-created_at'))
