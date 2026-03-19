@@ -4,6 +4,7 @@ import uuid
 class CrawlJob(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     target_url = models.URLField()
+    target_keywords = models.JSONField(default=list, blank=True)
     status = models.CharField(max_length=20, default='pending') # pending, processing, completed, failed
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -50,6 +51,7 @@ class Link(models.Model):
     anchor_text = models.CharField(max_length=500, null=True, blank=True)
     is_dofollow = models.BooleanField(default=True)
     is_broken = models.BooleanField(default=False)
+    redirect_chain_length = models.IntegerField(default=0)
 
     def __str__(self):
         source = self.source_page.url if self.source_page else "External/Initial"
@@ -60,11 +62,16 @@ class AuditIssue(models.Model):
         ('orphan', 'Orphan Page'),
         ('broken_link', 'Broken Link'),
         ('canonical_conflict', 'Canonical Conflict'),
+        ('redirect_chain', 'Redirect Chain'),
         ('noindex', 'Noindex in Sitemap'),
         ('duplicate_content', 'Duplicate Content'),
+        ('missing_sitemap', 'Missing from Sitemap'),
         ('schema_missing_coordinates', 'Missing Coordinates (LocalBusiness)'),
         ('schema_missing_sameas', 'Missing sameAs (Organization)'),
         ('schema_drift', 'Schema-to-Content Mismatch'),
+        ('eeat_missing_signal', 'Missing E-E-A-T Signal'),
+        ('keyword_missing', 'Target Keyword Missing'),
+        ('low_keyword_density', 'Low Keyword Density'),
     ]
     SEVERITY_CHOICES = [
         ('high', 'High'),

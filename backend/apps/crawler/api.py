@@ -1,15 +1,18 @@
 from ninja import Router
 from django.shortcuts import get_object_or_404
 from typing import List
-from .models import CrawlJob, AuditIssue, Recommendation
-from .schemas import CrawlJobCreate, CrawlJobResponse, AuditIssueSchema, RecommendationSchema
+from .models import CrawlJob, AuditIssue, Recommendation, CrawledPage
+from .schemas import CrawlJobCreate, CrawlJobResponse, AuditIssueSchema, RecommendationSchema, CrawledPageSchema
 from .tasks import run_crawl_job
 
 router = Router()
 
 @router.post("/start", response={200: dict})
 def create_crawl_job(request, data: CrawlJobCreate):
-    job = CrawlJob.objects.create(target_url=str(data.target_url))
+    job = CrawlJob.objects.create(
+        target_url=str(data.target_url),
+        target_keywords=data.target_keywords or []
+    )
     run_crawl_job.delay(str(job.id))
     return {"job_id": str(job.id), "message": "Crawl job started"}
 
@@ -31,3 +34,8 @@ def get_job_issues(request, job_id: str):
 def get_job_recommendations(request, job_id: str):
     job = get_object_or_404(CrawlJob, id=job_id)
     return list(Recommendation.objects.filter(job=job).order_by('priority'))
+
+@router.get("/status/{job_id}/pages", response=List[CrawledPageSchema])
+def get_job_pages(request, job_id: str):
+    job = get_object_or_404(CrawlJob, id=job_id)
+    return list(CrawledPage.objects.filter(job=job))

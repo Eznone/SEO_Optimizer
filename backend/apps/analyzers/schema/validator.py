@@ -1,6 +1,7 @@
 import logging
-from apps.crawler.models import CrawlJob, CrawledPage, AuditIssue
+from apps.crawler.models import CrawlJob, CrawledPage, AuditIssue, Recommendation
 import json
+from django.db.models import Count
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,47 @@ class SchemaValidator:
             for schema in page.json_ld_payload:
                 self._check_schema_node(page, schema)
                 self._check_schema_drift(page, schema)
+        
+        self.generate_recommendations()
+
+    def generate_recommendations(self):
+        """Summarizes issues into actionable recommendations."""
+        issue_counts = AuditIssue.objects.filter(job=self.job).values('issue_type').annotate(count=Count('id'))
+        
+        for item in issue_counts:
+            issue_type = item['issue_type']
+            count = item['count']
+            
+            if issue_type == 'schema_missing_coordinates':
+                Recommendation.objects.get_or_create(
+                    job=self.job,
+                    action_required="Add Geo-Coordinates to LocalBusiness Schema",
+                    defaults={
+                        'priority': 2,
+                        'business_impact': "Search engines use latitude/longitude to verify physical location for local SEO rankings. Missing coordinates can lead to deprioritization in 'near me' searches.",
+                        'affected_pages_count': count
+                    }
+                )
+            elif issue_type == 'schema_missing_sameas':
+                Recommendation.objects.get_or_create(
+                    job=self.job,
+                    action_required="Add 'sameAs' Social/Authority Links to Organization Schema",
+                    defaults={
+                        'priority': 3,
+                        'business_impact': "The 'sameAs' attribute helps search engines connect your website to your social profiles and authoritative sources like Wikipedia, building E-E-A-T.",
+                        'affected_pages_count': count
+                    }
+                )
+            elif issue_type == 'schema_drift':
+                Recommendation.objects.get_or_create(
+                    job=self.job,
+                    action_required="Fix Schema-to-Content Data Mismatch",
+                    defaults={
+                        'priority': 1,
+                        'business_impact': "Data drift (where schema says one thing and the page says another) is a major red flag for AI search engines and can lead to total suppression of your entity in generative results.",
+                        'affected_pages_count': count
+                    }
+                )
 
     def _check_schema_drift(self, page, node):
         """Simple check to see if schema data matches visible content."""
@@ -29,7 +71,7 @@ class SchemaValidator:
                     job=self.job,
                     page=page,
                     issue_type='schema_drift',
-                    severity='low',
+                    severity='high', # Increased severity as per handoff goals
                     description=f"Potential drift: Schema name '{schema_name}' does not match page title '{page.title}'."
                 )
 

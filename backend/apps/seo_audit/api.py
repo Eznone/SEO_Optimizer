@@ -1,61 +1,48 @@
 from ninja import Router
-
-from .tasks import run_seo_audit_task
 from .schemas import AuditRequest, AuditResponse, Error
-from urllib.parse import urlparse
-from django.core.exceptions import ValidationError
+from apps.crawler.models import CrawlJob
+from apps.crawler.tasks import run_crawl_job
 
 router = Router()
 
 @router.post("/audit", response={200: AuditResponse, 400: Error, 500: Error})
-def start_audit(request, data: AuditRequest):    # Validating the URL
+def start_audit(request, data: AuditRequest):
+    """
+    DEPRECATED: Use /api/crawler/start instead.
+    This legacy endpoint now maps to the new Crawler architecture.
+    """
     try:
-        result = urlparse(data.url)
-        if not all([result.scheme, result.netloc]):
-            raise ValidationError("Invalid URL format")
-        if result.scheme not in ['http', 'https']:
-            raise ValidationError("Only HTTP and HTTPS URLs are supported")
-    except Exception as e:
-        return 400, {
-            "error": str(e),
-            "message": "Invalid URL provided"
-        }
-    
-    # Starting the audit task
-    try:
-        task = run_seo_audit_task.delay(data.url, data.target_keywords)
+        # Map legacy request to new CrawlJob
+        job = CrawlJob.objects.create(
+            target_url=data.url,
+            target_keywords=data.target_keywords
+        )
+        run_crawl_job.delay(str(job.id))
+        
         return {
-            "message": "SEO audit started",
-            "job_id": task.id
+            "message": "SEO audit started (Migrated to Crawler)",
+            "job_id": str(job.id)
         }
     except Exception as e:
         return 500, {
             "error": str(e),
-            "message": "Failed to start audit task"
+            "message": "Failed to start migrated audit task"
         }
-    
-@router.get("/audit/{task_id}")
-def get_audit_result(request, task_id: str):
-    from celery.result import AsyncResult
+
+@router.get("/audit/{job_id}")
+def get_audit_result(request, job_id: str):
+    """
+    DEPRECATED: Use /api/crawler/status/{job_id} instead.
+    """
+    from django.shortcuts import redirect
+    # We can't easily redirect a ninja response to another router's URL path without hardcoding
+    # So we just return the status from the new model
     try:
-        task_result = AsyncResult(task_id)
-        if task_result.state == 'PENDING':
-            return {
-                "status": "Pending",
-                "message": "Audit is still in progress"
-            }
-        elif task_result.state == 'SUCCESS':
-            return {
-                "status": "Completed",
-                "result": task_result.result
-            }
-        else:
-            return {
-                "status": task_result.state,
-                "message": "Audit failed or was revoked"
-            }
-    except Exception as e:
-        return 500, {
-            "error": str(e),
-            "message": "Failed to retrieve audit result"
+        job = CrawlJob.objects.get(id=job_id)
+        return {
+            "status": job.status,
+            "message": "This endpoint is deprecated. Please use /api/crawler/status/{id} for detailed results.",
+            "job_id": str(job.id)
         }
+    except CrawlJob.DoesNotExist:
+        return 404, {"message": "Job not found"}
