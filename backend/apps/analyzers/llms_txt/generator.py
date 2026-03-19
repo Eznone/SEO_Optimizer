@@ -1,6 +1,7 @@
 import requests
 from urllib.parse import urlparse, urljoin
 from apps.crawler.models import CrawlJob, CrawledPage
+from apps.crawler.utils import save_file_safely
 from django.core.files.base import ContentFile
 from django.conf import settings
 import os
@@ -49,7 +50,9 @@ def process_llms_txt_job(job_id: str):
         
         # Save to the model's FileField
         file_name = f"{job.id}_llms.txt"
-        job.generated_llms_txt.save(file_name, ContentFile(content.encode('utf-8')), save=True)
+        
+        # Using Safe Saver for Windows/Eventlet compatibility
+        save_file_safely(job, 'generated_llms_txt', file_name, content.encode('utf-8'))
         
     except CrawlJob.DoesNotExist:
         pass

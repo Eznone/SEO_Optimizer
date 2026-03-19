@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from apps.crawler.models import CrawlJob, CrawledPage, AuditIssue, Recommendation, Link
-from django.core.files.base import ContentFile
+from apps.crawler.utils import save_file_safely
 from django.db.models import Count
 import logging
 
@@ -106,7 +106,9 @@ def process_sitemap_job(job_id: str):
         # XML Generation
         xml_content = generator.generate_xml()
         file_name = f"{job.id}_sitemap.xml"
-        job.generated_sitemap.save(file_name, ContentFile(xml_content), save=True)
+        
+        # Using Safe Saver for Windows/Eventlet compatibility
+        save_file_safely(job, 'generated_sitemap', file_name, xml_content)
         
         logger.info(f"Sitemap generated and validated for job {job_id}")
     except CrawlJob.DoesNotExist:
