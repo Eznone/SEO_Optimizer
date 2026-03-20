@@ -14,8 +14,8 @@ class CrawlJobResponse(Schema):
     status: str
     total_pages_crawled: int
     has_llms_txt: bool
-    llms_txt_url: Optional[str] = None
-    sitemap_url: Optional[str] = None
+    generated_llms_txt: Optional[str] = None
+    generated_sitemap: Optional[str] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
 

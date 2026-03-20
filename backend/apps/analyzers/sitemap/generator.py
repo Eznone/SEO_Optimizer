@@ -105,10 +105,10 @@ def process_sitemap_job(job_id: str):
         
         # XML Generation
         xml_content = generator.generate_xml()
-        file_name = f"{job.id}_sitemap.xml"
         
-        # Using Safe Saver for Windows/Eventlet compatibility
-        save_file_safely(job, 'generated_sitemap', file_name, xml_content)
+        # Save directly to the database as a string
+        job.generated_sitemap = xml_content.decode('utf-8')
+        job.save()
         
         logger.info(f"Sitemap generated and validated for job {job_id}")
     except CrawlJob.DoesNotExist:

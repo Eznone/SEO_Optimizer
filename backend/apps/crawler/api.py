@@ -20,10 +20,6 @@ def create_crawl_job(request, data: CrawlJobCreate):
 @router.get("/status/{job_id}", response=CrawlJobResponse)
 def get_crawl_job(request, job_id: str):
     job = get_object_or_404(CrawlJob, id=job_id, user=request.auth)
-    if job.generated_llms_txt:
-        job.llms_txt_url = job.generated_llms_txt.url
-    if job.generated_sitemap:
-        job.sitemap_url = job.generated_sitemap.url
     return job
 
 @router.get("/status/{job_id}/issues", response=List[AuditIssueSchema])

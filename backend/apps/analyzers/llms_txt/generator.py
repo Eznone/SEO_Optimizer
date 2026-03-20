@@ -48,11 +48,9 @@ def process_llms_txt_job(job_id: str):
         # 2. Generate if not exists
         content = generate_llms_txt(job)
         
-        # Save to the model's FileField
-        file_name = f"{job.id}_llms.txt"
-        
-        # Using Safe Saver for Windows/Eventlet compatibility
-        save_file_safely(job, 'generated_llms_txt', file_name, content.encode('utf-8'))
+        # Save directly to the database field
+        job.generated_llms_txt = content
+        job.save()
         
     except CrawlJob.DoesNotExist:
         pass

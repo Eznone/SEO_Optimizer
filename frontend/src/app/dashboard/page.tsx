@@ -14,16 +14,34 @@ type CrawlJob = {
   created_at: string;
 };
 
+type UserProfile = {
+  username: string;
+  email: string;
+  has_groq_key: boolean;
+};
+
 export default function Dashboard() {
   const [jobs, setJobs] = useState<CrawlJob[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [targetUrl, setTargetUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [crawling, setCrawling] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState(false);
 
   useEffect(() => {
     fetchJobs();
+    fetchProfile();
   }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const data = await apiFetch<UserProfile>(ENDPOINTS.ME);
+      setProfile(data);
+    } catch (err) {
+      console.error("Profile fetch error:", err);
+    }
+  };
 
   const fetchJobs = async () => {
     if (!loading) setRefreshing(true);
@@ -38,10 +56,19 @@ export default function Dashboard() {
     }
   };
 
-  const startCrawl = async (e: React.FormEvent) => {
+  const handleLaunchClick = (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetUrl) return;
 
+    if (profile && !profile.has_groq_key) {
+      setShowWarningModal(true);
+    } else {
+      executeCrawl();
+    }
+  };
+
+  const executeCrawl = async () => {
+    setShowWarningModal(false);
     setCrawling(true);
     try {
       await apiFetch(ENDPOINTS.START_CRAWL, {
@@ -61,11 +88,46 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-10">
+      {/* Warning Modal */}
+      {showWarningModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 max-w-md w-full p-8 animate-in fade-in zoom-in duration-200">
+            <div className="w-16 h-16 bg-yellow-50 text-yellow-600 rounded-full flex items-center justify-center mb-6 text-2xl">
+              ⚠️
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Missing Groq API Key</h3>
+            <p className="text-gray-500 mb-8 leading-relaxed">
+              You haven't set up your Groq API key yet. While the crawler will still work, 
+              you won't get the full benefit of <span className="font-bold text-gray-900">AI-powered E-E-A-T analysis</span> and advanced SEO insights.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setShowWarningModal(false)}
+                className="flex-1 px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeCrawl}
+                className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg"
+              >
+                Launch Anyway
+              </button>
+            </div>
+            <p className="mt-6 text-center">
+              <Link href="/dashboard/settings" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors underline underline-offset-4">
+                Go to settings to add your key
+              </Link>
+            </p>
+          </div>
+        </div>
+      )}
+
       <section>
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">New Analysis</h2>
           <p className="text-gray-500 mb-6">Enter a URL to start a comprehensive SEO and E-E-A-T audit.</p>
-          <form onSubmit={startCrawl} className="flex flex-col sm:flex-row gap-4">
+          <form onSubmit={handleLaunchClick} className="flex flex-col sm:flex-row gap-4">
             <input
               type="url"
               placeholder="https://example.com"

@@ -12,8 +12,8 @@ class CrawlJob(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True)
     total_pages_crawled = models.IntegerField(default=0)
     has_llms_txt = models.BooleanField(default=False)
-    generated_llms_txt = models.FileField(upload_to='llms_txts/', null=True, blank=True)
-    generated_sitemap = models.FileField(upload_to='sitemaps/', null=True, blank=True)
+    generated_llms_txt = models.TextField(null=True, blank=True)
+    generated_sitemap = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"Crawl Job for {self.target_url} - {self.status}"
