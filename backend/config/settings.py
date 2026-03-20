@@ -10,22 +10,26 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load .env file
+load_dotenv(BASE_DIR / '.env')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-d2&a5u!qa8p!tn^sfb2v)a^_@y5u$l*m-&%cg&x+d^+a*=7$q9'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-d2&a5u!qa8p!tn^sfb2v)a^_@y5u$l*m-&%cg&x+d^+a*=7$q9')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -38,7 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
-    
+
     # Allauth
     'allauth',
     'allauth.account',
@@ -70,16 +74,22 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-SITE_ID = 1
+SITE_ID = int(os.getenv('SITE_ID', '1'))
 
 # Allauth Settings
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*'] 
 ACCOUNT_EMAIL_VERIFICATION = 'optional' # For dev purposes
-LOGIN_REDIRECT_URL = '/dashboard'
-LOGOUT_REDIRECT_URL = '/'
 
-FIELD_ENCRYPTION_KEY = 'QhWzRFXRT9J8bxx4g4Qat676ha_5CQLfYMToUoL-O0k='
+# Frontend URLs
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+LOGIN_REDIRECT_URL = f'{FRONTEND_URL}/dashboard'
+LOGOUT_REDIRECT_URL = f'{FRONTEND_URL}/'
+
+SOCIALACCOUNT_LOGIN_ON_GET = True
+APPEND_SLASH = False
+
+FIELD_ENCRYPTION_KEY = os.getenv('FIELD_ENCRYPTION_KEY', 'QhWzRFXRT9J8bxx4g4Qat676ha_5CQLfYMToUoL-O0k=')
 
 ROOT_URLCONF = 'config.urls'
 
@@ -157,5 +167,13 @@ MEDIA_ROOT = BASE_DIR
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Celery Configuration
-CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://127.0.0.1:6379/0')
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+
+# Security Settings for Frontend
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
+
+# Proxy Settings
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

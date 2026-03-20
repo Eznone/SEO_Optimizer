@@ -1,19 +1,36 @@
 import type { NextConfig } from "next";
 
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+
 const nextConfig: NextConfig = {
+  experimental: {
+    allowedDevOrigins: ["172.21.80.1", "localhost:3000"],
+  },
   async rewrites() {
     return [
       {
+        source: "/api/:path*/",
+        destination: `${BACKEND_URL}/api/:path*/`, // Proxy to Backend
+      },
+      {
         source: "/api/:path*",
-        destination: "http://127.0.0.1:8000/api/:path*", // Proxy to Backend
+        destination: `${BACKEND_URL}/api/:path*`, // Proxy to Backend
+      },
+      {
+        source: "/accounts/:path*/",
+        destination: `${BACKEND_URL}/accounts/:path*/`, // Proxy to Backend Allauth
       },
       {
         source: "/accounts/:path*",
-        destination: "http://127.0.0.1:8000/accounts/:path*", // Proxy to Backend Allauth
+        destination: `${BACKEND_URL}/accounts/:path*`, // Proxy to Backend Allauth
+      },
+      {
+        source: "/static/:path*/",
+        destination: `${BACKEND_URL}/static/:path*/`, // Proxy for django static files
       },
       {
         source: "/static/:path*",
-        destination: "http://127.0.0.1:8000/static/:path*", // Proxy for django static files
+        destination: `${BACKEND_URL}/static/:path*`, // Proxy for django static files
       }
     ];
   },

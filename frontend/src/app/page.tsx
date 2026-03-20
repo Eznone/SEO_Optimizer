@@ -1,3 +1,5 @@
+import { ENDPOINTS } from "@/lib/api";
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
@@ -7,13 +9,13 @@ export default function Home() {
         </div>
         <nav className="flex space-x-4">
           <a
-            href="/accounts/google/login/"
+            href={ENDPOINTS.LOGIN}
             className="text-gray-600 hover:text-indigo-600 font-medium px-3 py-2 rounded-md transition-colors"
           >
             Login
           </a>
           <a
-            href="/accounts/google/login/"
+            href={ENDPOINTS.LOGIN}
             className="bg-indigo-600 text-white px-5 py-2 rounded-md font-medium hover:bg-indigo-700 transition-colors shadow-sm"
           >
             Get Started
@@ -31,16 +33,10 @@ export default function Home() {
 
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <a
-            href="/accounts/google/login/"
+            href={ENDPOINTS.LOGIN}
             className="w-full sm:w-auto flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:py-4 md:text-lg shadow-md transition-all"
           >
-            Sign in with Google
-          </a>
-          <a
-            href="/accounts/github/login/"
-            className="w-full sm:w-auto flex items-center justify-center px-8 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 md:py-4 md:text-lg shadow-sm transition-all"
-          >
-            Sign in with GitHub
+            Sign in
           </a>
         </div>
 

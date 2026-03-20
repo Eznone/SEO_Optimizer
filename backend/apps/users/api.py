@@ -1,3 +1,4 @@
+from django.contrib.auth import logout
 from ninja import Router, Schema
 from typing import Optional
 from .models import UserProfile
@@ -26,3 +27,8 @@ def update_api_key(request, data: ApiKeyUpdate):
     profile.groq_api_key = data.groq_api_key
     profile.save()
     return {"message": "API key updated successfully"}
+
+@router.post("/logout")
+def user_logout(request):
+    logout(request)
+    return {"message": "Logged out successfully"}

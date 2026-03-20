@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch, ENDPOINTS } from "@/lib/api";
 
 type UserProfile = {
   username: string;
@@ -27,24 +28,20 @@ export default function Dashboard() {
 
   useEffect(() => {
     // Check authentication
-    fetch("/api/users/me")
-      .then((res) => {
-        if (!res.ok) throw new Error("Unauthorized");
-        return res.json();
-      })
+    apiFetch<UserProfile>(ENDPOINTS.ME)
       .then((data) => {
         setProfile(data);
         fetchJobs();
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Auth error:", err);
         router.push("/");
       })
       .finally(() => setLoading(false));
   }, [router]);
 
   const fetchJobs = () => {
-    fetch("/api/crawler/jobs")
-      .then((res) => res.json())
+    apiFetch<CrawlJob[]>(ENDPOINTS.JOBS)
       .then((data) => setJobs(data))
       .catch(console.error);
   };
@@ -55,23 +52,29 @@ export default function Dashboard() {
 
     setCrawling(true);
     try {
-      const res = await fetch("/api/crawler/start", {
+      await apiFetch(ENDPOINTS.START_CRAWL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ target_url: targetUrl, target_keywords: [] }),
       });
 
-      if (res.ok) {
-        setTargetUrl("");
-        // Re-fetch jobs or wait a moment
-        setTimeout(fetchJobs, 1000);
-      }
+      setTargetUrl("");
+      // Re-fetch jobs or wait a moment
+      setTimeout(fetchJobs, 1000);
     } catch (err) {
-      console.error(err);
+      console.error("Crawl error:", err);
     } finally {
       setCrawling(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await apiFetch(ENDPOINTS.LOGOUT, { method: "POST" });
+      router.push("/");
+    } catch (err) {
+      console.error("Logout error:", err);
+      // Even if the API call fails, we should probably redirect to the home/login page
+      router.push("/");
     }
   };
 
@@ -85,12 +88,12 @@ export default function Dashboard() {
         <div className="text-xl font-bold text-indigo-600">SEO Analyzer Dashboard</div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">Welcome, {profile?.username || profile?.email}</span>
-          <a
-            href="/accounts/logout/"
+          <button
+            onClick={handleLogout}
             className="text-sm text-red-600 hover:text-red-800 font-medium"
           >
             Logout
-          </a>
+          </button>
         </div>
       </header>
 
