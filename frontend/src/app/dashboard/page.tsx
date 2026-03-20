@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { apiFetch, ENDPOINTS } from "@/lib/api";
-
-type UserProfile = {
-  username: string;
-  email: string;
-  has_groq_key: boolean;
-};
 
 type CrawlJob = {
   id: string;
@@ -19,31 +12,21 @@ type CrawlJob = {
 };
 
 export default function Dashboard() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [jobs, setJobs] = useState<CrawlJob[]>([]);
   const [targetUrl, setTargetUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [crawling, setCrawling] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
-    // Check authentication
-    apiFetch<UserProfile>(ENDPOINTS.ME)
-      .then((data) => {
-        setProfile(data);
-        fetchJobs();
-      })
-      .catch((err) => {
-        console.error("Auth error:", err);
-        router.push("/");
-      })
-      .finally(() => setLoading(false));
-  }, [router]);
+    fetchJobs();
+  }, []);
 
   const fetchJobs = () => {
+    setLoading(true);
     apiFetch<CrawlJob[]>(ENDPOINTS.JOBS)
       .then((data) => setJobs(data))
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setLoading(false));
   };
 
   const startCrawl = async (e: React.FormEvent) => {
@@ -59,7 +42,7 @@ export default function Dashboard() {
 
       setTargetUrl("");
       // Re-fetch jobs or wait a moment
-      setTimeout(fetchJobs, 1000);
+      setTimeout(fetchJobs, 1500);
     } catch (err) {
       console.error("Crawl error:", err);
     } finally {
@@ -67,104 +50,114 @@ export default function Dashboard() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await apiFetch(ENDPOINTS.LOGOUT, { method: "POST" });
-      router.push("/");
-    } catch (err) {
-      console.error("Logout error:", err);
-      // Even if the API call fails, we should probably redirect to the home/login page
-      router.push("/");
-    }
-  };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-      <header className="w-full py-4 px-8 bg-white shadow-sm flex justify-between items-center">
-        <div className="text-xl font-bold text-indigo-600">SEO Analyzer Dashboard</div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">Welcome, {profile?.username || profile?.email}</span>
-          <button
-            onClick={handleLogout}
-            className="text-sm text-red-600 hover:text-red-800 font-medium"
-          >
-            Logout
-          </button>
-        </div>
-      </header>
-
-      <main className="flex-1 max-w-5xl w-full mx-auto p-6 md:p-8">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Initialize a New Crawl</h2>
-          <form onSubmit={startCrawl} className="flex gap-4">
+    <div className="space-y-10">
+      <section>
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">New Analysis</h2>
+          <p className="text-gray-500 mb-6">Enter a URL to start a comprehensive SEO and E-E-A-T audit.</p>
+          <form onSubmit={startCrawl} className="flex flex-col sm:flex-row gap-4">
             <input
               type="url"
               placeholder="https://example.com"
               value={targetUrl}
               onChange={(e) => setTargetUrl(e.target.value)}
               required
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow text-gray-900"
+              className="flex-1 px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-gray-900 bg-gray-50 focus:bg-white"
             />
             <button
               type="submit"
               disabled={crawling}
-              className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
             >
-              {crawling ? "Starting..." : "Start Crawl"}
+              {crawling ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  Starting...
+                </>
+              ) : "Launch Crawler"}
             </button>
           </form>
         </div>
+      </section>
 
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Your Recent Jobs</h2>
-          {jobs.length === 0 ? (
-            <div className="text-gray-500 bg-white p-8 rounded-xl border border-gray-200 text-center">
-              No crawl jobs found. Start one above!
+      <section>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Recent Audits</h2>
+          <button 
+            onClick={fetchJobs}
+            className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            Refresh
+          </button>
+        </div>
+
+        {loading && jobs.length === 0 ? (
+          <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center">
+            <div className="inline-block animate-pulse text-indigo-600 mb-2">Loading your jobs...</div>
+          </div>
+        ) : jobs.length === 0 ? (
+          <div className="text-gray-500 bg-white p-12 rounded-2xl border border-gray-200 text-center shadow-sm">
+            <div className="w-16 h-16 bg-gray-50 text-gray-300 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             </div>
-          ) : (
-            <div className="bg-white shadow-sm border border-gray-200 rounded-xl overflow-hidden">
+            <p className="text-lg font-medium text-gray-600">No crawl jobs found.</p>
+            <p className="text-sm text-gray-400 mt-1">Start your first analysis by entering a URL above!</p>
+          </div>
+        ) : (
+          <div className="bg-white shadow-sm border border-gray-200 rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-left">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Target URL</th>
-                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Pages Crawled</th>
-                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-8 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Target URL</th>
+                    <th className="px-8 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-8 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Pages</th>
+                    <th className="px-8 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-8 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {jobs.map((job) => (
-                    <tr key={job.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {job.target_url}
+                    <tr key={job.id} className="hover:bg-gray-50 transition-colors group">
+                      <td className="px-8 py-5 whitespace-nowrap">
+                        <div className="text-sm font-bold text-gray-900">{job.target_url}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      <td className="px-8 py-5 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
                           job.status === 'completed' ? 'bg-green-100 text-green-800' :
                           job.status === 'failed' ? 'bg-red-100 text-red-800' :
                           'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {job.status}
+                          <span className={`w-1.5 h-1.5 rounded-full mr-2 ${
+                            job.status === 'completed' ? 'bg-green-500' :
+                            job.status === 'failed' ? 'bg-red-500' :
+                            'bg-yellow-500'
+                          }`}></span>
+                          {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-8 py-5 whitespace-nowrap text-sm text-gray-500 text-center font-medium">
                         {job.total_pages_crawled}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(job.created_at).toLocaleDateString()}
+                      <td className="px-8 py-5 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(job.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </td>
+                      <td className="px-8 py-5 whitespace-nowrap text-right">
+                        <button className="text-indigo-600 hover:text-indigo-900 text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                          View Report →
+                        </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
-      </main>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
+

@@ -3,9 +3,6 @@ import type { NextConfig } from "next";
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    allowedDevOrigins: ["172.21.80.1", "localhost:3000"],
-  },
   async rewrites() {
     return [
       {
