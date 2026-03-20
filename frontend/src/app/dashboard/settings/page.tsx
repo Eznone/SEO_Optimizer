@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [apiKey, setApiKey] = useState("");
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const handleUpdateKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,8 +32,69 @@ export default function SettingsPage() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== "Delete Account") return;
+    
+    setDeleting(true);
+    try {
+      await apiFetch("/api/users/delete-account", { method: "DELETE" });
+      router.push("/");
+    } catch (err: any) {
+      alert(err.message || "Failed to delete account");
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-8">
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-md w-full p-8 animate-in fade-in zoom-in duration-200">
+            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mb-6 text-2xl">
+              🗑️
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Delete Account?</h3>
+            <p className="text-gray-500 mb-6 leading-relaxed">
+              This action is <span className="font-bold text-red-600 uppercase">permanent</span>. All your crawl data, sitemaps, and settings will be deleted forever.
+            </p>
+            
+            <div className="space-y-4 mb-8">
+              <label className="block text-sm font-bold text-gray-700">
+                Type <span className="italic">Delete Account</span> to confirm:
+              </label>
+              <input
+                type="text"
+                placeholder="Delete Account"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                className="w-full px-4 py-3 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all text-gray-900 bg-red-50/30"
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmation("");
+                }}
+                disabled={deleting}
+                className="flex-1 px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50 transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmation !== "Delete Account" || deleting}
+                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? "Deleting..." : "Confirm Deletion"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">User Settings</h2>
         
@@ -87,7 +153,10 @@ export default function SettingsPage() {
             <p className="text-gray-500 text-sm mb-4">
               Permanently delete your account and all associated crawl data.
             </p>
-            <button className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors">
+            <button 
+              onClick={() => setShowDeleteModal(true)}
+              className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors"
+            >
               Delete Account
             </button>
           </section>

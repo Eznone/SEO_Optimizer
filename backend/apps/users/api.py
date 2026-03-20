@@ -32,3 +32,9 @@ def update_api_key(request, data: ApiKeyUpdate):
 def user_logout(request):
     logout(request)
     return {"message": "Logged out successfully"}
+
+@router.delete("/delete-account")
+def delete_account(request):
+    user = request.auth
+    user.delete()
+    return {"message": "Account deleted successfully"}
