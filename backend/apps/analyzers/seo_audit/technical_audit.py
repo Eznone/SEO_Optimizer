@@ -3,24 +3,14 @@ import logging
 from apps.crawler.models import CrawlJob, CrawledPage, AuditIssue, Recommendation, Link
 from django.db.models import Count
 from urllib.parse import urlparse
-import httpx
-import os
-import json
+from agents.technical_agent import TechnicalAgent
 
 logger = logging.getLogger(__name__)
 
 class TechnicalAuditAnalyzer:
-    GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-    MODEL = "llama-3.3-70b-versatile"
-
     def __init__(self, job: CrawlJob):
         self.job = job
-        self.api_key = self._get_user_api_key()
-
-    def _get_user_api_key(self):
-        if self.job.user and hasattr(self.job.user, 'profile'):
-            return self.job.user.profile.groq_api_key
-        return os.getenv("GROQ_API_KEY")
+        self.agent = TechnicalAgent(user=job.user)
 
     def analyze(self):
         self.check_internal_link_depth()
@@ -96,7 +86,7 @@ class TechnicalAuditAnalyzer:
 
     def check_toxic_outgoing_links(self):
         """Use AI to identify potentially toxic outgoing links."""
-        if not self.api_key:
+        if not self.agent.api_key:
             return
 
         # Get external links
@@ -107,51 +97,23 @@ class TechnicalAuditAnalyzer:
 
         links_to_check = [l['target_url'] for l in external_links]
         
-        prompt = f"""
-        Analyze the following list of outgoing links from a website. 
-        Identify if any of these appear to be 'link farms', spammy directories, or high-risk 'bad neighborhoods' for SEO in 2026.
-        
-        Links:
-        {json.dumps(links_to_check)}
-        
-        Return the result ONLY in JSON format:
-        {{
-            "toxic_links": [
-                {{"url": "toxic-url.com", "reason": "Known link farm", "severity": "high"}}
-            ]
-        }}
-        If none are toxic, return an empty list for "toxic_links".
-        """
+        result = self.agent.check_toxic_links(links_to_check)
 
-        try:
-            with httpx.Client() as client:
-                response = client.post(
-                    self.GROQ_API_URL,
-                    headers={"Authorization": f"Bearer {self.api_key}"},
-                    json={
-                        "model": self.MODEL,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "response_format": {"type": "json_object"}
-                    },
-                    timeout=30.0
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    result = json.loads(data['choices'][0]['message']['content'])
-                    
-                    for item in result.get('toxic_links', []):
-                        # Find a link object to attach this to
-                        link_obj = Link.objects.filter(job=self.job, target_url=item['url']).first()
-                        AuditIssue.objects.create(
-                            job=self.job,
-                            page=link_obj.source_page if link_obj else None,
-                            issue_type='toxic_link',
-                            severity=item.get('severity', 'medium'),
-                            description=f"Outgoing link to {item['url']} flagged as toxic: {item['reason']}."
-                        )
-        except Exception as e:
-            logger.error(f"Error checking toxic links: {e}")
+        if result:
+            try:
+                for item in result.get('toxic_links', []):
+                    # Find a link object to attach this to
+                    link_obj = Link.objects.filter(job=self.job, target_url=item['url']).first()
+                    AuditIssue.objects.create(
+                        job=self.job,
+                        page=link_obj.source_page if link_obj else None,
+                        issue_type='toxic_link',
+                        severity=item.get('severity', 'medium'),
+                        description=f"Outgoing link to {item['url']} flagged as toxic: {item['reason']}."
+                    )
+            except Exception as e:
+                logger.error(f"Error processing toxic link agent result: {e}")
+
 
     def check_mobile_readiness(self):
         """Basic check for mobile-first optimization (Viewport meta tag)."""

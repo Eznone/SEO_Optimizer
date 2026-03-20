@@ -1,26 +1,14 @@
-import httpx
 import logging
-import os
 import json
 from apps.crawler.models import CrawlJob, CrawledPage, AuditIssue, Recommendation
-from django.conf import settings
+from agents.eeat_agent import EEATAgent
 
 logger = logging.getLogger(__name__)
 
 class EEATScorer:
-    GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-    MODEL = "llama-3.3-70b-versatile"
-
     def __init__(self, job: CrawlJob):
         self.job = job
-        self.api_key = self._get_user_api_key()
-
-    def _get_user_api_key(self):
-        """Fetches the Groq API key from the user's profile."""
-        if self.job.user and hasattr(self.job.user, 'profile'):
-            return self.job.user.profile.groq_api_key
-        # Fallback to env var for legacy/system jobs (optional)
-        return os.getenv("GROQ_API_KEY")
+        self.agent = EEATAgent(user=job.user)
 
     def score_all_pages(self, limit=10):
         """Scores pages for E-E-A-T and Conversational Structure."""
@@ -35,67 +23,29 @@ class EEATScorer:
         self.generate_recommendations()
 
     def _score_page(self, page: CrawledPage):
-        if not self.api_key or self.api_key == "your_groq_api_key_here":
+        if not self.agent.api_key:
             logger.warning("GROQ_API_KEY not set, skipping E-E-A-T scoring.")
             return
 
-        prompt = f"""
-        Analyze the following web page content for 2026 SEO standards (E-E-A-T and Conversational Search optimization).
+        result = self.agent.analyze_page(page.extracted_text)
         
-        Content:
-        {page.extracted_text[:4000]}
-        
-        Evaluate based on:
-        1. Conversational Structure: Does it answer questions quickly? (0-10)
-        2. E-E-A-T: Are there author credentials, expert bios, or verifiable claims? (0-10)
-        3. Extractability: Is the information easy for an LLM to extract (e.g., lists, clear headers)? (0-10)
-        
-        Return the result ONLY in JSON format like this:
-        {{
-            "conversational_score": 8,
-            "eeat_score": 7,
-            "extractability_score": 9,
-            "issues": ["No clear author bio", "Missing direct answer to main query"],
-            "summary": "Short summary of findings"
-        }}
-        """
-
-        try:
-            with httpx.Client() as client:
-                response = client.post(
-                    self.GROQ_API_URL,
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": self.MODEL,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "response_format": {"type": "json_object"}
-                    },
-                    timeout=30.0
-                )
+        if result:
+            try:
+                # Store results or create issues
+                for issue_desc in result.get('issues', []):
+                    AuditIssue.objects.create(
+                        job=self.job,
+                        page=page,
+                        issue_type='eeat_missing_signal',
+                        severity='medium',
+                        description=issue_desc
+                    )
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    result = json.loads(data['choices'][0]['message']['content'])
-                    
-                    # Store results or create issues
-                    for issue_desc in result.get('issues', []):
-                        AuditIssue.objects.create(
-                            job=self.job,
-                            page=page,
-                            issue_type='eeat_missing_signal',
-                            severity='medium',
-                            description=issue_desc
-                        )
-                    
-                    logger.info(f"E-E-A-T scored for {page.url}")
-                else:
-                    logger.error(f"Groq API error: {response.status_code} - {response.text}")
-                    
-        except Exception as e:
-            logger.error(f"Error scoring page {page.url} with Groq: {e}")
+                logger.info(f"E-E-A-T scored for {page.url}")
+            except Exception as e:
+                logger.error(f"Error processing agent result for {page.url}: {e}")
+        else:
+            logger.error(f"Agent failed to score page {page.url}")
 
     def generate_recommendations(self):
         """Summarizes E-E-A-T issues into actionable recommendations."""
