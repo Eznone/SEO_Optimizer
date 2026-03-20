@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch, ENDPOINTS } from "@/lib/api";
+import Link from "next/link";
+import { apiFetch, ENDPOINTS, getBackendUrl } from "@/lib/api";
 
 type CrawlJob = {
   id: string;
   target_url: string;
   status: string;
   total_pages_crawled: number;
+  sitemap_url: string | null;
+  llms_txt_url: string | null;
   created_at: string;
 };
 
@@ -16,17 +19,23 @@ export default function Dashboard() {
   const [targetUrl, setTargetUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [crawling, setCrawling] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchJobs();
   }, []);
 
-  const fetchJobs = () => {
-    setLoading(true);
-    apiFetch<CrawlJob[]>(ENDPOINTS.JOBS)
-      .then((data) => setJobs(data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+  const fetchJobs = async () => {
+    if (!loading) setRefreshing(true);
+    try {
+      const data = await apiFetch<CrawlJob[]>(ENDPOINTS.JOBS);
+      setJobs(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   const startCrawl = async (e: React.FormEvent) => {
@@ -41,8 +50,8 @@ export default function Dashboard() {
       });
 
       setTargetUrl("");
-      // Re-fetch jobs or wait a moment
-      setTimeout(fetchJobs, 1500);
+      // Re-fetch jobs after a short delay
+      setTimeout(fetchJobs, 2000);
     } catch (err) {
       console.error("Crawl error:", err);
     } finally {
@@ -83,13 +92,17 @@ export default function Dashboard() {
 
       <section>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Recent Audits</h2>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Recent Audits</h2>
+            <p className="text-xs text-gray-500 mt-1">Audit complete? Experiment with our specialized tools in the sidebar!</p>
+          </div>
           <button 
             onClick={fetchJobs}
-            className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+            disabled={refreshing}
+            className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-            Refresh
+            <svg className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            {refreshing ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
 
@@ -144,10 +157,22 @@ export default function Dashboard() {
                       <td className="px-8 py-5 whitespace-nowrap text-sm text-gray-500">
                         {new Date(job.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </td>
-                      <td className="px-8 py-5 whitespace-nowrap text-right">
-                        <button className="text-indigo-600 hover:text-indigo-900 text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                          View Report →
-                        </button>
+                      <td className="px-8 py-5 whitespace-nowrap text-right space-x-3">
+                        {job.sitemap_url && (
+                          <a 
+                            href={getBackendUrl(job.sitemap_url)} 
+                            target="_blank" 
+                            className="text-xs font-bold text-indigo-600 hover:underline"
+                          >
+                            XML Sitemap
+                          </a>
+                        )}
+                        <Link 
+                          href={`/dashboard/seo-audit/${job.id}`}
+                          className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-all shadow-sm"
+                        >
+                          View Report
+                        </Link>
                       </td>
                     </tr>
                   ))}

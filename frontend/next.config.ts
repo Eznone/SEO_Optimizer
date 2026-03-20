@@ -28,6 +28,14 @@ const nextConfig: NextConfig = {
       {
         source: "/static/:path*",
         destination: `${BACKEND_URL}/static/:path*`, // Proxy for django static files
+      },
+      {
+        source: "/media/:path*/",
+        destination: `${BACKEND_URL}/media/:path*/`, // Proxy for django media files
+      },
+      {
+        source: "/media/:path*",
+        destination: `${BACKEND_URL}/media/:path*`, // Proxy for django media files
       }
     ];
   },

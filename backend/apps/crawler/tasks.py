@@ -24,12 +24,14 @@ def run_crawl_job(job_id: str):
         from apps.analyzers.schema.validator import process_schema_validation
         from apps.analyzers.eeat.scorer import process_eeat_scoring
         from apps.analyzers.seo_audit.keyword_analyzer import process_keyword_analysis
+        from apps.analyzers.seo_audit.technical_audit import process_technical_audit
         
         process_llms_txt_job(job_id)
         process_sitemap_job(job_id)
         process_schema_validation(job_id)
         process_eeat_scoring(job_id)
         process_keyword_analysis(job_id)
+        process_technical_audit(job_id)
         
     except Exception as e:
         logger.error(f"Crawl job {job_id} failed: {e}")

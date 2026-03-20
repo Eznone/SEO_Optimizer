@@ -8,3 +8,6 @@ redis
 eventlet
 django-allauth
 python-dotenv
+psycopg2-binary
+django-encrypted-model-fields
+dj-database-url

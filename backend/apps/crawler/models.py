@@ -74,6 +74,10 @@ class AuditIssue(models.Model):
         ('eeat_missing_signal', 'Missing E-E-A-T Signal'),
         ('keyword_missing', 'Target Keyword Missing'),
         ('low_keyword_density', 'Low Keyword Density'),
+        ('ai_bot_blocked', 'AI Bot Blocked'),
+        ('high_link_depth', 'High Internal Link Depth'),
+        ('toxic_link', 'Toxic Outgoing Link'),
+        ('mobile_parity_issue', 'Mobile-First Parity Issue'),
     ]
     SEVERITY_CHOICES = [
         ('high', 'High'),

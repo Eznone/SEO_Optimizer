@@ -1,16 +1,17 @@
 # Pre-Deployment Checklist
 
-This checklist covers the essential steps to transition from local development to a production environment.
+This checklist covers the essential steps to transition from local development to a production environment, with a focus on the **Oracle Cloud (Backend) + Vercel (Frontend)** free tier strategy.
 
-## 1. Backend (Django)
+## 1. Backend (Django) - Oracle Cloud Free Tier
+Oracle Cloud offers high-performance ARM (Ampere A1) instances with up to 24GB RAM for free, which is perfect for running Django, Celery, Redis, and Postgres together using Docker Compose.
+
 - [ ] **Security**: Set `DEBUG = False` in your production environment variables.
 - [ ] **Secrets**: Generate a new, unique `SECRET_KEY` for production. Never reuse the development key.
-- [ ] **Hosts**: Update `ALLOWED_HOSTS` to include your production API domain (e.g., `api.yourdomain.com`).
-- [ ] **CSRF**: Update `CSRF_TRUSTED_ORIGINS` to include your production frontend URL (e.g., `https://app.yourdomain.com`).
-- [ ] **Redirects**: Set `FRONTEND_URL` in `.env` to ensure `LOGIN_REDIRECT_URL` and `LOGOUT_REDIRECT_URL` point to the live site.
-- [ ] **Database**: Configure a production-grade database (e.g., PostgreSQL or Managed MySQL). Update `DATABASES` in `settings.py` or use `DATABASE_URL`.
-- [ ] **Migrations**: Run `python manage.py migrate` on the production server.
-- [ ] **Static Files**: Setup a strategy for serving static files (e.g., using **WhiteNoise** or an **S3 Bucket**). Run `python manage.py collectstatic`.
+- [ ] **Hosts**: Update `ALLOWED_HOSTS` to include your Oracle instance's Public IP or domain (e.g., `api.yourdomain.com`).
+- [ ] **CSRF**: Update `CSRF_TRUSTED_ORIGINS` to include your **Vercel** production URL (e.g., `https://your-app.vercel.app`).
+- [ ] **Redirects**: Set `FRONTEND_URL` in `.env` to point to your live Vercel site.
+- [ ] **Database Migration**: Move from SQLite to **PostgreSQL**. Update `DATABASES` in `settings.py` to use environment variables.
+- [ ] **Static Files**: Setup a strategy for serving static files. Since you have a VPS (Oracle), you can use **Nginx** or **WhiteNoise** with `python manage.py collectstatic`.
 - [ ] **Secure Cookies**: Enable production security settings in `settings.py`:
     ```python
     SESSION_COOKIE_SECURE = True
@@ -18,24 +19,33 @@ This checklist covers the essential steps to transition from local development t
     CSRF_COOKIE_SAMESITE = 'Lax'
     SESSION_COOKIE_SAMESITE = 'Lax'
     ```
-- [ ] **Encryption**: Ensure `FIELD_ENCRYPTION_KEY` is securely stored and consistent across deployments.
+- [ ] **Oracle Security List**: Open the necessary ports in the Oracle Cloud Console (Ingress Rules):
+    *   `80` (HTTP) - for Nginx
+    *   `443` (HTTPS) - for SSL (using Certbot/Let's Encrypt)
+    *   `8000` - (Optional) if exposing Django directly for testing
+- [ ] **Oracle OS Firewall**: Run `iptables` or `firewall-cmd` commands on the instance to open the ports at the OS level.
+- [ ] **Docker Architecture**: Ensure your Docker images are built for **ARM64** (Oracle ARM instances) or use multi-arch builds.
 
-## 2. Frontend (Next.js)
-- [ ] **API URL**: Set `BACKEND_URL` (server-side) and `NEXT_PUBLIC_BACKEND_URL` (client-side) to your production API domain.
-- [ ] **Environment Variables**: Ensure all variables from `exmaple.env` are defined in your hosting platform (e.g., Vercel, Netlify).
-- [ ] **Build**: Run `npm run build` locally to verify there are no TypeScript or linting errors before pushing.
-- [ ] **OAuth**: Update Redirect URIs in the Google/GitHub Developer Consoles to match your production domain:
+## 2. Frontend (Next.js) - Vercel
+Vercel is the industry standard for Next.js deployment and offers a robust free tier.
+
+- [ ] **API Proxy**: In `next.config.ts`, ensure `BACKEND_URL` is set to your Oracle instance's domain.
+- [ ] **Environment Variables**: Add all variables from `exmaple.env` to the **Vercel Dashboard** (Settings -> Environment Variables).
+- [ ] **Rewrites**: Verify that `/api/`, `/accounts/`, and `/media/` are correctly proxied to your Oracle backend in `next.config.ts`.
+- [ ] **OAuth**: Update Redirect URIs in the Google/GitHub Developer Consoles:
     *   `https://api.yourdomain.com/accounts/google/login/callback/`
     *   `https://api.yourdomain.com/accounts/github/login/callback/`
 
-## 3. Infrastructure & Background Tasks
-- [ ] **Redis**: Provision a production Redis instance for Celery. Update `CELERY_BROKER_URL` and `CELERY_RESULT_BACKEND`.
-- [ ] **Workers**: Configure your production environment to run Celery workers as background processes (e.g., using `systemd`, `supervisor`, or platform-native background workers).
-- [ ] **SSL**: Ensure both frontend and backend are served over **HTTPS**.
-- [ ] **Proxy**: If using a custom server, configure Nginx or Apache as a reverse proxy.
+## 3. Infrastructure & Background Tasks (Oracle VPS)
+Running all services on a single high-memory Oracle instance.
+
+- [ ] **Redis**: Run a Redis container on your Oracle instance. Update `CELERY_BROKER_URL` and `CELERY_RESULT_BACKEND` to point to `redis://localhost:6379/0` (within the Docker network).
+- [ ] **Workers**: Run at least one Celery worker and one Celery beat container. Monitor them with a tool like `watchtower` or `portainer` (both can run on Oracle).
+- [ ] **SSL (HTTPS)**: Install `certbot` and use Nginx to terminate SSL for your API domain. Vercel handles SSL automatically for the frontend.
+- [ ] **Persistence**: Ensure your Docker Compose uses **Volumes** so that your Postgres data and generated media files (sitemaps, LLMS.txt) aren't lost when containers restart.
 
 ## 4. Final Verification
-- [ ] **Auth Flow**: Verify Login, Logout, and OAuth registration on the production domain.
-- [ ] **CSRF**: Confirm that POST requests (like starting a crawl or logging out) succeed without CSRF errors.
-- [ ] **Crawling**: Ensure the backend server has the necessary outbound permissions to crawl external websites.
-- [ ] **Logs**: Verify that application logs are being captured and are accessible for troubleshooting.
+- [ ] **Auth Flow**: Verify Login, Logout, and OAuth registration across both domains.
+- [ ] **Media Access**: Confirm you can download a generated sitemap from the Vercel frontend (it should proxy through to the Oracle VPS storage).
+- [ ] **Worker Health**: Trigger a crawl and verify that the worker on the Oracle instance picks it up and successfully processes it.
+- [ ] **Outbound Requests**: Confirm that the Oracle instance can successfully reach external sites (no egress blocking).
